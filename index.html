@@ -245,6 +245,13 @@ if('webkitSpeechRecognition' in window){
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="apple-touch-icon" href="icon-192.png">
 
+<link rel="manifest" href="manifest.json">
+
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="AI Gym Coach">
+
+<link rel="apple-touch-icon" href="icon-512.png">
+
 </body>
 <script>
 if('serviceWorker' in navigator){
@@ -253,3 +260,4 @@ if('serviceWorker' in navigator){
     .catch(err => console.log('Service Worker Registration Failed:', err));
 }
 </script>
+
