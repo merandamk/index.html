@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<title>AI Gym Coach</title>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+
+body{
+font-family:Arial;
+background:#0f172a;
+color:white;
+text-align:center;
+margin:0;
+}
+
+header{
+background:#020617;
+padding:20px;
+font-size:26px;
+}
+
+.counter{
+font-size:100px;
+margin:20px;
+}
+
+button{
+padding:15px 25px;
+margin:6px;
+border:none;
+border-radius:10px;
+font-size:16px;
+}
+
+.green{background:#22c55e;color:white;}
+.blue{background:#3b82f6;color:white;}
+.orange{background:#f97316;color:white;}
+.red{background:#ef4444;color:white;}
+
+input{
+padding:10px;
+margin:6px;
+}
+
+.section{
+margin-top:30px;
+}
+
+canvas{
+background:white;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<header>🤖 AI Gym Coach</header>
+
+<h2 id="activityName">Select Activity</h2>
+
+<div class="counter" id="display">0</div>
+
+<button class="green" onclick="addRep()">+ Rep</button>
+<button class="blue" onclick="startTimer()">Start Timer</button>
+<button class="red" onclick="reset()">Reset</button>
+
+<div class="section">
+
+<h3>Add Exercise / Cardio / Stretch</h3>
+
+<input id="activityInput" placeholder="Activity name">
+
+<button onclick="addActivity()">Save Activity</button>
+
+</div>
+
+<div class="section">
+
+<h3>Your Exercises</h3>
+
+<div id="activityList"></div>
+
+</div>
+
+<div class="section">
+
+<h3>AI Suggested Workout</h3>
+
+<button onclick="generateWorkout()">Generate Workout</button>
+
+<div id="workoutPlan"></div>
+
+</div>
+
+<div class="section">
+
+<h3>Progress</h3>
+
+<canvas id="chart" width="350" height="200"></canvas>
+
+</div>
+
+<script>
+
+let reps=0
+let seconds=0
+let timer
+let activities=JSON.parse(localStorage.getItem("activities"))||[]
+
+function addActivity(){
+
+let name=document.getElementById("activityInput").value
+
+if(!name)return
+
+activities.push(name)
+
+localStorage.setItem("activities",JSON.stringify(activities))
+
+renderActivities()
+
+}
+
+function renderActivities(){
+
+let container=document.getElementById("activityList")
+
+container.innerHTML=""
+
+activities.forEach(a=>{
+
+let btn=document.createElement("button")
+
+btn.innerText=a
+
+container.appendChild(btn)
+
+})
+
+}
+
+function addRep(){
+
+reps++
+
+document.getElementById("display").innerText=reps
+
+}
+
+function startTimer(){
+
+seconds=0
+
+clearInterval(timer)
+
+timer=setInterval(()=>{
+
+seconds++
+
+document.getElementById("display").innerText=seconds
+
+},1000)
+
+}
+
+function reset(){
+
+reps=0
+seconds=0
+
+clearInterval(timer)
+
+document.getElementById("display").innerText=0
+
+}
+
+function generateWorkout(){
+
+let exercises=[
+
+"Bench Press",
+"Squats",
+"Deadlift",
+"Shoulder Press",
+"Plank",
+"Bike 20 minutes",
+"Treadmill 10 minutes",
+"Hamstring Stretch",
+"Quad Stretch"
+
+]
+
+let plan=""
+
+for(let i=0;i<5;i++){
+
+let r=Math.floor(Math.random()*exercises.length)
+
+plan+=exercises[r]+"<br>"
+
+}
+
+document.getElementById("workoutPlan").innerHTML=plan
+
+}
+
+renderActivities()
+
+// Voice recognition
+
+if ('webkitSpeechRecognition' in window){
+
+let recognition=new webkitSpeechRecognition()
+
+recognition.continuous=true
+
+recognition.onresult=function(event){
+
+let speech=event.results[event.results.length-1][0].transcript.trim().toLowerCase()
+
+if(speech.includes("rep")) addRep()
+
+if(speech.includes("start")) startTimer()
+
+if(speech.includes("reset")) reset()
+
+}
+
+recognition.start()
+
+}
+
+// Chart
+
+let ctx=document.getElementById('chart').getContext('2d')
+
+new Chart(ctx,{
+type:'line',
+data:{
+labels:["Week1","Week2","Week3","Week4"],
+datasets:[{
+label:"Strength Progress",
+data:[135,155,165,185]
+}]
+}
+})
+
+</script>
+
+</body>
+</html>
