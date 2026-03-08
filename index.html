@@ -7,62 +7,72 @@
 <title>AI Gym Coach</title>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
 
-<!-- PWA -->
 <link rel="manifest" href="manifest.json">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="AI Gym Coach">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link rel="apple-touch-icon" href="icon-512.png">
 
 <style>
 
 body{
+margin:0;
 font-family:Arial;
 background:#0f172a;
 color:white;
 text-align:center;
-margin:0;
 }
 
 header{
+padding:15px;
+font-size:22px;
 background:#020617;
-padding:20px;
-font-size:26px;
 }
 
-.counter{
-font-size:100px;
-margin:20px;
-}
+.section{display:none;padding:20px}
+.active{display:block}
 
 button{
-padding:15px 25px;
+padding:12px 18px;
 margin:6px;
 border:none;
 border-radius:10px;
-font-size:16px;
+font-size:15px;
+cursor:pointer;
 }
 
-.green{background:#22c55e;color:white;}
-.blue{background:#3b82f6;color:white;}
-.orange{background:#f97316;color:white;}
-.red{background:#ef4444;color:white;}
+.green{background:#22c55e}
+.blue{background:#3b82f6}
+
+.counter{
+font-size:70px;
+margin:10px;
+}
+
+#exerciseCanvas{
+width:100%;
+height:250px;
+}
+
+nav{
+position:fixed;
+bottom:0;
+width:100%;
+background:#020617;
+display:flex;
+justify-content:space-around;
+padding:10px;
+}
+
+nav button{
+background:none;
+color:white;
+font-size:14px;
+}
 
 input{
 padding:10px;
 margin:6px;
-font-size:16px;
-}
-
-.section{
-margin-top:30px;
-}
-
-canvas{
-background:white;
-margin-top:20px;
+font-size:15px;
 }
 
 </style>
@@ -72,457 +82,394 @@ margin-top:20px;
 
 <header>🤖 AI Gym Coach</header>
 
-<h2 id="activityName">Select Activity</h2>
-<div class="counter" id="display">0</div>
+<!-- WORKOUT PAGE -->
+
+<div id="workout" class="section active">
+
+<h2 id="coach">Generate workout</h2>
+
+<div id="exerciseCanvas"></div>
+
+<div class="counter" id="repCounter">0</div>
 
 <button class="green" onclick="addRep()">+ Rep</button>
-<button class="blue" onclick="startTimer()">Start Timer</button>
-<button class="red" onclick="reset()">Reset</button>
+<button class="blue" onclick="startRest()">Rest</button>
 
-<div class="section">
-<h3>Add Exercise / Cardio / Stretch</h3>
-<input id="activityInput" placeholder="Activity name">
-<button onclick="addActivity()">Save Activity</button>
-</div>
+<br><br>
 
-<div class="section">
-<h3>Your Activities</h3>
-<div id="activityList"></div>
-</div>
+<button onclick="generateWorkout()">AI Workout</button>
 
-<div class="section">
-<h3>Daily Workout</h3>
-<button onclick="generateWorkout()">Generate Workout</button>
-<div id="workoutPlan"></div>
-</div>
-
-<div class="section">
-<h3>Progress Tracker</h3>
-<canvas id="progressChart" width="350" height="200"></canvas>
-</div>
-
-<div class="section">
-
-<h2>Fitness Dashboard</h2>
-
-<h3>Weekly Activity</h3>
-<canvas id="weeklyChart"></canvas>
-
-<h3>Monthly Activity</h3>
-<canvas id="monthlyChart"></canvas>
-
-<h3>Cardio vs Strength</h3>
-<canvas id="typeChart"></canvas>
-
-<h3>Workout Streak</h3>
-<div id="streakDisplay" style="font-size:40px;margin:10px;"></div>
-
-<h3>Calories Burned</h3>
-<div id="caloriesDisplay" style="font-size:30px;"></div>
+<div id="plan"></div>
 
 </div>
+
+<!-- BODY TRACKING -->
+
+<div id="body" class="section">
+
+<h3>Body Tracking</h3>
+
+<input id="weightInput" placeholder="Weight">
+<input id="fatInput" placeholder="Body Fat %">
+
+<button onclick="saveBody()">Save</button>
+
+<canvas id="bodyChart"></canvas>
+
+</div>
+
+<!-- TRAINER CHAT -->
+
+<div id="trainer" class="section">
+
+<h3>AI Personal Trainer</h3>
+
+<div id="chat" style="height:200px;overflow:auto;text-align:left"></div>
+
+<input id="chatInput" placeholder="Ask trainer...">
+
+<button onclick="chat()">Send</button>
+
+</div>
+
+<!-- STATS -->
+
+<div id="stats" class="section">
+
+<h3>Workout Stats</h3>
+
+<div id="calories"></div>
+
+<canvas id="progressChart"></canvas>
+
+</div>
+
+<!-- NAV -->
+
+<nav>
+
+<button onclick="show('workout')">Workout</button>
+<button onclick="show('body')">Body</button>
+<button onclick="show('trainer')">Trainer</button>
+<button onclick="show('stats')">Stats</button>
+
+</nav>
 
 <script>
 
-// ===== Variables =====
+/* STORAGE */
 
-let reps = 0;
-let seconds = 0;
-let timer;
-let currentActivity = null;
+let history = JSON.parse(localStorage.getItem("history")) || []
+let bodyStats = JSON.parse(localStorage.getItem("bodyStats")) || []
 
-let activities = JSON.parse(localStorage.getItem("activities")) || [];
-let workoutHistory = JSON.parse(localStorage.getItem("workoutHistory")) || [];
+/* EXERCISES */
 
-// ===== Activity Management =====
+const exercises=[
 
-function addActivity(){
-
-let name = document.getElementById("activityInput").value;
-
-if(!name) return;
-
-if(!activities.includes(name)) activities.push(name);
-
-localStorage.setItem("activities", JSON.stringify(activities));
-
-renderActivities();
-
-document.getElementById("activityInput").value = "";
-
-}
-
-function renderActivities(){
-
-let container = document.getElementById("activityList");
-
-container.innerHTML = "";
-
-activities.forEach(a => {
-
-let btn = document.createElement("button");
-
-btn.innerText = a;
-
-btn.onclick = () => selectActivity(a);
-
-container.appendChild(btn);
-
-});
-
-}
-
-function selectActivity(name){
-
-currentActivity = name;
-
-document.getElementById("activityName").innerText = name;
-
-reset();
-
-}
-
-// ===== Reps & Timer =====
-
-function addRep(){
-
-reps++;
-
-document.getElementById("display").innerText = reps;
-
-}
-
-function startTimer(){
-
-seconds = 0;
-
-clearInterval(timer);
-
-timer = setInterval(()=>{
-
-seconds++;
-
-document.getElementById("display").innerText = seconds;
-
-},1000);
-
-}
-
-function reset(){
-
-reps = 0;
-
-seconds = 0;
-
-clearInterval(timer);
-
-document.getElementById("display").innerText = 0;
-
-}
-
-// ===== Save Workout =====
-
-function saveWorkout(){
-
-if(!currentActivity) return;
-
-let entry = {
-
-activity: currentActivity,
-
-reps: reps,
-
-duration: seconds,
-
-date: new Date().toLocaleDateString()
-
-};
-
-workoutHistory.push(entry);
-
-localStorage.setItem("workoutHistory", JSON.stringify(workoutHistory));
-
-updateProgressChart();
-
-buildDashboard();
-
-}
-
-// ===== Daily Workout Generator =====
-
-function generateWorkout(){
-
-if(activities.length === 0){
-
-document.getElementById("workoutPlan").innerHTML = "No activities saved yet!";
-
-return;
-
-}
-
-let available = [...activities];
-
-let dailyPlan = [];
-
-for(let i=0;i<5;i++){
-
-let r = Math.floor(Math.random()*available.length);
-
-dailyPlan.push(available[r]);
-
-}
-
-document.getElementById("workoutPlan").innerHTML = dailyPlan.join("<br>");
-
-}
-
-// ===== Progress Chart =====
-
-function updateProgressChart(){
-
-let ctx = document.getElementById('progressChart').getContext('2d');
-
-let dates = workoutHistory.map(w => w.date);
-
-let repsData = workoutHistory.map(w => w.reps || 0);
-
-let durationData = workoutHistory.map(w => w.duration || 0);
-
-if(window.myChart) window.myChart.destroy();
-
-window.myChart = new Chart(ctx,{
-
-type:'line',
-
-data:{
-
-labels:dates,
-
-datasets:[
-
-{label:"Reps",data:repsData,borderColor:"green",fill:false},
-
-{label:"Duration",data:durationData,borderColor:"blue",fill:false}
+{name:"Pushups",muscle:"chest",reps:12,sets:3},
+{name:"Squats",muscle:"legs",reps:15,sets:3},
+{name:"Plank",muscle:"core",reps:30,sets:3},
+{name:"Lunges",muscle:"legs",reps:12,sets:3}
 
 ]
 
+/* PERIODIZED PLAN */
+
+function generateWorkout(){
+
+let week=Math.floor(history.length/4)
+
+let plan=[]
+
+exercises.forEach(ex=>{
+
+let r=ex.reps+(week*2)
+
+plan.push({...ex,reps:r})
+
+})
+
+workout=plan.sort(()=>0.5-Math.random()).slice(0,3)
+
+index=0
+set=1
+reps=0
+
+renderPlan()
+
+startExercise()
+
 }
 
-});
+/* WORKOUT ENGINE */
+
+let workout=[]
+let index=0
+let set=1
+let reps=0
+let calories=0
+
+function renderPlan(){
+
+document.getElementById("plan").innerHTML=
+
+workout.map(e=>e.name+" "+e.reps+" reps x "+e.sets).join("<br>")
 
 }
 
-// ===== Dashboard =====
+function startExercise(){
 
-function buildDashboard(){
+let ex=workout[index]
 
-let history = JSON.parse(localStorage.getItem("workoutHistory")) || [];
+document.getElementById("coach").innerText=
 
-let weekly = {};
+ex.name+" "+ex.reps+" reps (set "+set+")"
 
-let monthly = {};
+speak("Start "+ex.name)
 
-let cardio = 0;
+}
 
-let strength = 0;
+function addRep(){
 
-let calories = 0;
+reps++
 
-history.forEach(w=>{
+document.getElementById("repCounter").innerText=reps
 
-let date = new Date(w.date);
+let ex=workout[index]
 
-let weekDay = date.toLocaleDateString('en-US',{weekday:'short'});
+if(reps>=ex.reps){
 
-let monthDay = date.getDate();
+burnCalories(ex)
 
-weekly[weekDay] = (weekly[weekDay] || 0) + (w.reps || 1);
+nextSet()
 
-monthly[monthDay] = (monthly[monthDay] || 0) + (w.reps || 1);
+}
 
-let activity = (w.activity || "").toLowerCase();
+}
 
-if(activity.includes("run") || activity.includes("bike") || activity.includes("swim")){
+function nextSet(){
 
-cardio++;
+let ex=workout[index]
 
-calories += (w.duration || 60) * 8;
+if(set<ex.sets){
+
+set++
+reps=0
+startRest()
 
 }else{
 
-strength++;
-
-calories += (w.reps || 10) * 0.5;
+nextExercise()
 
 }
 
-});
+}
 
-buildWeeklyChart(weekly);
+function startRest(){
 
-buildMonthlyChart(monthly);
+let t=20
 
-buildTypeChart(cardio,strength);
+document.getElementById("coach").innerText="Rest"
 
-document.getElementById("caloriesDisplay").innerText = Math.round(calories) + " kcal burned";
+let timer=setInterval(()=>{
 
-calculateStreak(history);
+t--
+
+document.getElementById("repCounter").innerText=t
+
+if(t<=0){
+
+clearInterval(timer)
+
+startExercise()
 
 }
 
-function buildWeeklyChart(data){
-
-let ctx = document.getElementById("weeklyChart");
-
-new Chart(ctx,{
-
-type:'bar',
-
-data:{
-
-labels:Object.keys(data),
-
-datasets:[{
-
-label:'Weekly Activity',
-
-data:Object.values(data)
-
-}]
+},1000)
 
 }
 
-});
+function nextExercise(){
+
+index++
+set=1
+reps=0
+
+if(index>=workout.length){
+
+finishWorkout()
+return
 
 }
 
-function buildMonthlyChart(data){
+startExercise()
 
-let ctx = document.getElementById("monthlyChart");
+}
 
-new Chart(ctx,{
+function finishWorkout(){
+
+document.getElementById("coach").innerText="Workout complete"
+
+history.push({date:new Date().toDateString()})
+
+localStorage.setItem("history",JSON.stringify(history))
+
+updateChart()
+
+}
+
+/* CALORIES */
+
+function burnCalories(ex){
+
+calories += ex.reps*0.5
+
+document.getElementById("calories").innerText=
+
+"Calories burned: "+Math.round(calories)
+
+}
+
+/* VOICE */
+
+function speak(text){
+
+let msg=new SpeechSynthesisUtterance(text)
+
+speechSynthesis.speak(msg)
+
+}
+
+/* BODY TRACKING */
+
+function saveBody(){
+
+let w=document.getElementById("weightInput").value
+let f=document.getElementById("fatInput").value
+
+bodyStats.push({w,f})
+
+localStorage.setItem("bodyStats",JSON.stringify(bodyStats))
+
+drawBodyChart()
+
+}
+
+function drawBodyChart(){
+
+let ctx=document.getElementById("bodyChart")
+
+let weights=bodyStats.map(b=>b.w)
+
+if(window.bodyChart)bodyChart.destroy()
+
+window.bodyChart=new Chart(ctx,{
 
 type:'line',
+data:{labels:weights,datasets:[{data:weights}]}
 
-data:{
-
-labels:Object.keys(data),
-
-datasets:[{
-
-label:'Monthly Activity',
-
-data:Object.values(data)
-
-}]
+})
 
 }
 
-});
+/* PROGRESS */
+
+function updateChart(){
+
+let ctx=document.getElementById("progressChart")
+
+let data=history.map((h,i)=>i+1)
+
+if(window.chart)chart.destroy()
+
+window.chart=new Chart(ctx,{
+
+type:'line',
+data:{labels:data,datasets:[{data:data}]}
+
+})
 
 }
 
-function buildTypeChart(cardio,strength){
+/* CHAT */
 
-let ctx = document.getElementById("typeChart");
+function chat(){
 
-new Chart(ctx,{
+let input=document.getElementById("chatInput").value
 
-type:'doughnut',
+let div=document.createElement("div")
+div.innerText="You: "+input
+chat.appendChild(div)
 
-data:{
+let reply=document.createElement("div")
 
-labels:["Cardio","Strength"],
+if(input.includes("workout"))
+reply.innerText="Trainer: Focus on compound exercises."
 
-datasets:[{
+else if(input.includes("fat"))
+reply.innerText="Trainer: Combine cardio and strength."
 
-data:[cardio,strength]
+else
+reply.innerText="Trainer: Stay consistent."
 
-}]
-
-}
-
-});
-
-}
-
-function calculateStreak(history){
-
-let dates = history.map(w=>new Date(w.date).toDateString());
-
-let uniqueDates = [...new Set(dates)].sort((a,b)=> new Date(a)-new Date(b));
-
-let streak = 1;
-
-for(let i=1;i<uniqueDates.length;i++){
-
-let prev = new Date(uniqueDates[i-1]);
-
-let curr = new Date(uniqueDates[i]);
-
-let diff = (curr-prev)/(1000*60*60*24);
-
-if(diff === 1){
-
-streak++;
-
-}else{
-
-streak = 1;
+chat.appendChild(reply)
 
 }
 
-}
+/* NAVIGATION */
 
-document.getElementById("streakDisplay").innerText = "🔥 " + streak + " Day Streak";
+function show(id){
 
-}
+document.querySelectorAll(".section")
 
-// ===== Voice Recognition =====
+.forEach(s=>s.classList.remove("active"))
 
-if('webkitSpeechRecognition' in window){
-
-let recognition = new webkitSpeechRecognition();
-
-recognition.continuous = true;
-
-recognition.onresult = function(event){
-
-let speech = event.results[event.results.length-1][0].transcript.trim().toLowerCase();
-
-if(speech.includes("rep")) addRep();
-
-if(speech.includes("start")) startTimer();
-
-if(speech.includes("reset")) reset();
-
-if(speech.includes("save")) saveWorkout();
+document.getElementById(id).classList.add("active")
 
 }
 
-recognition.start();
+/* 3D ANIMATION */
+
+let scene=new THREE.Scene()
+let camera=new THREE.PerspectiveCamera(75,1,0.1,1000)
+let renderer=new THREE.WebGLRenderer()
+
+renderer.setSize(300,200)
+
+document.getElementById("exerciseCanvas").appendChild(renderer.domElement)
+
+let geometry=new THREE.BoxGeometry()
+let material=new THREE.MeshBasicMaterial({color:0x22c55e})
+let cube=new THREE.Mesh(geometry,material)
+
+scene.add(cube)
+camera.position.z=3
+
+function animate(){
+
+requestAnimationFrame(animate)
+
+cube.rotation.x+=0.01
+cube.rotation.y+=0.01
+
+renderer.render(scene,camera)
 
 }
 
-// ===== Service Worker =====
+animate()
+
+/* SERVICE WORKER */
 
 if('serviceWorker' in navigator){
 
 navigator.serviceWorker.register('sw.js')
 
-.then(()=>console.log("Service Worker Registered"))
-
-.catch(err=>console.log(err));
-
 }
 
-// ===== Initialize =====
+/* INIT */
 
-renderActivities();
-
-updateProgressChart();
-
-buildDashboard();
+updateChart()
+drawBodyChart()
 
 </script>
 
