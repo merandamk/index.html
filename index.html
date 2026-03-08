@@ -88,6 +88,26 @@ canvas{
 <canvas id="progressChart" width="350" height="200"></canvas>
 </div>
 
+  <div class="section">
+<h2>Fitness Dashboard</h2>
+
+<h3>Weekly Activity</h3>
+<canvas id="weeklyChart"></canvas>
+
+<h3>Monthly Activity</h3>
+<canvas id="monthlyChart"></canvas>
+
+<h3>Cardio vs Strength</h3>
+<canvas id="typeChart"></canvas>
+
+<h3>Workout Streak</h3>
+<div id="streakDisplay" style="font-size:40px;margin:10px;"></div>
+
+<h3>Calories Burned</h3>
+<div id="caloriesDisplay" style="font-size:30px;"></div>
+
+</div>
+  
 <script>
 // ===== Variables =====
 let reps = 0;
@@ -239,6 +259,125 @@ if('webkitSpeechRecognition' in window){
 </body>
 </html>
 
+function buildDashboard(){
+
+let history = JSON.parse(localStorage.getItem("workoutHistory")) || [];
+
+let weekly = {};
+let monthly = {};
+let cardio = 0;
+let strength = 0;
+let calories = 0;
+
+history.forEach(w=>{
+
+let date = new Date(w.date);
+let weekDay = date.toLocaleDateString('en-US',{weekday:'short'});
+let monthDay = date.getDate();
+
+weekly[weekDay] = (weekly[weekDay] || 0) + (w.reps || 1);
+monthly[monthDay] = (monthly[monthDay] || 0) + (w.reps || 1);
+
+let activity = (w.activity || "").toLowerCase();
+
+if(activity.includes("run") || activity.includes("bike") || activity.includes("swim") || activity.includes("cardio")){
+cardio++;
+calories += (w.duration || 60) * 8;
+}else{
+strength++;
+calories += (w.reps || 10) * 0.5;
+}
+
+});
+
+buildWeeklyChart(weekly);
+buildMonthlyChart(monthly);
+buildTypeChart(cardio,strength);
+
+document.getElementById("caloriesDisplay").innerText =
+Math.round(calories) + " kcal burned";
+
+calculateStreak(history);
+
+}
+
+function buildWeeklyChart(data){
+
+let ctx = document.getElementById("weeklyChart");
+
+new Chart(ctx,{
+type:'bar',
+data:{
+labels:Object.keys(data),
+datasets:[{
+label:'Weekly Activity',
+data:Object.values(data)
+}]
+}
+});
+
+}
+
+function buildMonthlyChart(data){
+
+let ctx = document.getElementById("monthlyChart");
+
+new Chart(ctx,{
+type:'line',
+data:{
+labels:Object.keys(data),
+datasets:[{
+label:'Monthly Activity',
+data:Object.values(data)
+}]
+}
+});
+
+}
+
+function buildTypeChart(cardio,strength){
+
+let ctx = document.getElementById("typeChart");
+
+new Chart(ctx,{
+type:'doughnut',
+data:{
+labels:["Cardio","Strength"],
+datasets:[{
+data:[cardio,strength]
+}]
+}
+});
+
+}
+
+function calculateStreak(history){
+
+let dates = history.map(w=>new Date(w.date).toDateString());
+let uniqueDates = [...new Set(dates)].sort((a,b)=> new Date(a)-new Date(b));
+
+let streak = 1;
+
+for(let i=1;i<uniqueDates.length;i++){
+
+let prev = new Date(uniqueDates[i-1]);
+let curr = new Date(uniqueDates[i]);
+
+let diff = (curr-prev)/(1000*60*60*24);
+
+if(diff === 1){
+streak++;
+}else{
+streak = 1;
+}
+
+}
+
+document.getElementById("streakDisplay").innerText =
+"🔥 " + streak + " Day Streak";
+
+}
+  
 <link rel="manifest" href="manifest.json">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="AI Gym Coach">
@@ -260,4 +399,5 @@ if('serviceWorker' in navigator){
     .catch(err => console.log('Service Worker Registration Failed:', err));
 }
 </script>
+
 
